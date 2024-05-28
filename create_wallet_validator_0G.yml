@@ -1,0 +1,30 @@
+---
+- name: Create Wallet for 0G Validator Node
+  hosts: localhost
+  become: true
+  vars_prompt:
+    - name: wallet_name
+      prompt: "Enter your wallet name"
+      private: false
+
+  tasks:
+    - name: Ensure wallet directory exists
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/0g-validator-node/run"
+        state: directory
+        mode: '0755'
+
+    - name: Add new wallet and store output
+      ansible.builtin.shell: |
+        echo y | 0gchaind keys add {{ wallet_name }} --eth --keyring-backend test > {{ ansible_env.HOME }}/0g-validator-node/run/{{ wallet_name }}.info
+      args:
+        executable: /bin/bash
+
+    - name: Display wallet creation output
+      ansible.builtin.command:
+        cmd: cat {{ ansible_env.HOME }}/0g-validator-node/run/{{ wallet_name }}.info
+      register: wallet_output
+
+    - name: Show wallet output
+      ansible.builtin.debug:
+        msg: "{{ wallet_output.stdout }}"

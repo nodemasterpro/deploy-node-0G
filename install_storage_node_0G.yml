@@ -1,0 +1,126 @@
+---
+- name: Install 0G Storage Node
+  hosts: localhost
+  become: true
+
+  vars_prompt:
+    - name: wallet_name
+      prompt: "Enter your wallet name"
+      private: false
+
+  vars:
+    ZGS_LOG_DIR: "{{ ansible_env.HOME }}/0g-storage-node/run/log"
+    ZGS_LOG_CONFIG_FILE: "{{ ansible_env.HOME }}/0g-storage-node/run/log_config"
+    LOG_CONTRACT_ADDRESS: "0x2b8bC93071A6f8740867A7544Ad6653AdEB7D919"
+    MINE_CONTRACT: "0x228aCfB30B839b269557214216eA4162db24445d"
+
+  tasks:
+    - name: System updates and installation of required environments
+      ansible.builtin.apt:
+        update_cache: yes
+        name:
+          - clang
+          - cmake
+          - build-essential
+
+    - name: Install Go
+      ansible.builtin.shell: |
+        wget https://go.dev/dl/go1.22.0.linux-amd64.tar.gz
+        sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.22.0.linux-amd64.tar.gz
+        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bash_profile
+      args:
+        executable: /bin/bash
+
+    - name: Install Rustup
+      ansible.builtin.shell: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      args:
+        executable: /bin/bash
+
+    - name: Clone and install 0gchaind
+      ansible.builtin.shell: |
+        git clone -b v0.1.0 https://github.com/0glabs/0g-chain.git
+        ./0g-chain/networks/testnet/install.sh
+        echo 'export PATH=$PATH:{{ ansible_env.HOME }}/go/bin' >> ~/.profile
+        source ~/.profile
+      args:
+        executable: /bin/bash
+
+    - name: Clone the 0G Storage Node repository
+      ansible.builtin.git:
+        repo: 'https://github.com/0glabs/0g-storage-node.git'
+        dest: "{{ ansible_env.HOME }}/0g-storage-node"
+        version: "tags/v0.2.0"
+        force: yes
+
+    - name: Build the 0G Storage Node
+      ansible.builtin.shell: |
+        cd {{ ansible_env.HOME }}/0g-storage-node
+        git submodule update --init
+        sudo apt install -y cargo
+        cargo build --release
+      args:
+        executable: /bin/bash
+
+    - name: Set environment variables in .bash_profile
+      ansible.builtin.shell: |
+        echo 'export ZGS_LOG_DIR="{{ ZGS_LOG_DIR }}"' >> ~/.bash_profile
+        echo 'export ZGS_LOG_CONFIG_FILE="{{ ZGS_LOG_CONFIG_FILE }}"' >> ~/.bash_profile
+        echo 'export LOG_CONTRACT_ADDRESS="{{ LOG_CONTRACT_ADDRESS }}"' >> ~/.bash_profile
+        echo 'export MINE_CONTRACT="{{ MINE_CONTRACT }}"' >> ~/.bash_profile
+        source ~/.bash_profile
+      args:
+        executable: /bin/bash
+
+    - name: Source profile to ensure 0gchaind is in PATH
+      ansible.builtin.shell: |
+        source ~/.profile
+      args:
+        executable: /bin/bash
+
+    - name: Check if wallet info exists
+      stat:
+        path: "{{ ansible_env.HOME }}/0g-storage-node/run/{{ wallet_name }}.info"
+      register: wallet_info_check
+
+    - name: Fail if wallet info does not exist
+      fail:
+        msg: "Wallet information file does not exist. Run the create_wallet_0G.yml playbook first."
+      when: not wallet_info_check.stat.exists
+
+    - name: Export and store private key
+      ansible.builtin.shell: |
+        PRIVATE_KEY=$(echo y | 0gchaind keys unsafe-export-eth-key {{ wallet_name }} --keyring-backend test)
+        if [ -z "$PRIVATE_KEY" ]; then
+          echo "Failed to retrieve the private key."
+          exit 1
+        fi
+        echo $PRIVATE_KEY
+      register: private_key_output
+
+    - name: Store private key in config
+      ansible.builtin.shell: |
+        sed -i 's|miner_key = ""|miner_key = "{{ private_key_output.stdout }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+
+    - name: Update config.toml
+      ansible.builtin.shell: |
+        sed -i 's|# log_config_file = "log_config"|log_config_file = "{{ ZGS_LOG_CONFIG_FILE }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|# log_directory = "log"|log_directory = "{{ ZGS_LOG_DIR }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|mine_contract_address = ".*"|mine_contract_address = "{{ MINE_CONTRACT }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|log_contract_address = ".*"|log_contract_address = "{{ LOG_CONTRACT_ADDRESS }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|blockchain_rpc_endpoint = "https://rpc-testnet.0g.ai"|blockchain_rpc_endpoint = "https://0g-evm.rpc.nodebrand.xyz"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|# network_dir = "network"|network_dir = "network"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|# network_libp2p_port = 1234|network_libp2p_port = 1234|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|network_boot_nodes = \["/ip4/54.219.26.22/udp/1234/p2p/16Uiu2HAmPxGNWu9eVAQPJww79J32pTJLKGcpjRMb4Qb8xxKkyuG1","/ip4/52.52.127.117/udp/1234/p2p/16Uiu2HAm93Hd5azfhkGBbkx1zero3nYHvfjQYM2NtiW4R3r5bE2g"\]|network_boot_nodes = \["/ip4/54.219.26.22/udp/1234/p2p/16Uiu2HAmTVDGNhkHD98zDnJxQWu3i1FL1aFYeh9wiQTNu4pDCgps","/ip4/52.52.127.117/udp/1234/p2p/16Uiu2HAkzRjxK2gorngB1Xq84qDrT4hSVznYDHj6BkbaE4SGx9oS"\]|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|# db_dir = "db"|db_dir = "db"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+
+    - name: Create systemd service file for 0G Storage Node
+      ansible.builtin.template:
+        src: templates/zgs-node.service.j2
+        dest: /etc/systemd/system/zgs-node.service
+
+    - name: Enable and start ZGS service
+      ansible.builtin.systemd:
+        name: zgs-node
+        enabled: true
+        state: stopped

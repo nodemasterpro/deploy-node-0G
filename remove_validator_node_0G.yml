@@ -1,0 +1,45 @@
+---
+- name: Remove 0G Validator Node
+  hosts: localhost
+  become: true
+
+  tasks:
+    - name: Stop and disable 0G Validator Node service
+      ansible.builtin.systemd:
+        name: 0gd-node
+        state: stopped
+        enabled: false
+
+    - name: Remove 0G Validator Node service file
+      ansible.builtin.file:
+        path: /etc/systemd/system/0gd-node.service
+        state: absent
+
+    - name: Remove 0G Validator Node data directory
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/.0gchain"
+        state: absent
+
+    - name: Remove 0g-chain repository
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/0g-chain"
+        state: absent
+
+    - name: Remove Go binary
+      ansible.builtin.file:
+        path: /usr/local/go
+        state: absent
+
+    - name: Remove Go bin from PATH in .bash_profile
+      ansible.builtin.lineinfile:
+        path: ~/.bash_profile
+        regexp: 'export PATH=\$PATH:/usr/local/go/bin:\$HOME/go/bin'
+        state: absent
+
+    - name: Reload systemd to apply changes
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Display message
+      ansible.builtin.debug:
+        msg: "0G Validator Node has been removed successfully."

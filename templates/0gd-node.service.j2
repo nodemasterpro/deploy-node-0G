@@ -1,0 +1,13 @@
+[Unit]
+Description=0G Node
+After=network.target
+
+[Service]
+User=root
+Type=simple
+ExecStart={{ ansible_env.HOME }}/go/bin/0gchaind start --home {{ ansible_env.HOME }}/.0gchain
+Restart=on-failure
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

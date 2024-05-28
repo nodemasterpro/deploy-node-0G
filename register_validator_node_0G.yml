@@ -1,0 +1,71 @@
+---
+- name: Register 0G Validator Node
+  hosts: localhost
+  become: true
+  vars_prompt:
+    - name: moniker
+      prompt: "Enter the moniker for the validator"
+      private: false
+    - name: details
+      prompt: "Enter details for the validator"
+      private: false
+    - name: website
+      prompt: "Enter the website for the validator"
+      private: false
+
+  tasks:
+    - name: Retrieve PUBLIC_KEY for validator
+      ansible.builtin.shell: 0gchaind tendermint show-validator
+      register: public_key
+      changed_when: false
+
+    - name: Create validator.json configuration file
+      ansible.builtin.copy:
+        dest: "{{ ansible_env.HOME }}/.0gchain/config/validator.json"
+        content: |
+          {
+            "pubkey": "{{ public_key.stdout }}",
+            "amount": "1000000ua0gi",
+            "moniker": "{{ moniker }}",
+            "website": "{{ website }}",
+            "details": "{{ details }}",
+            "commission-rate": "0.05",
+            "commission-max-rate": "0.10",
+            "commission-max-change-rate": "0.01",
+            "min-self-delegation": "1"
+          }
+        mode: 0644
+
+    - name: Register the validator node
+      ansible.builtin.shell: |
+        0gchaind tx staking create-validator \
+          --amount=1000000ua0gi \
+          --pubkey={{ public_key.stdout }} \
+          --moniker={{ moniker }} \
+          --chain-id={{ CHAIN_ID }} \
+          --commission-rate=0.05 \
+          --commission-max-rate=0.10 \
+          --commission-max-change-rate=0.01 \
+          --min-self-delegation=1 \
+          --from={{ wallet_name }} \
+          --identity="" \
+          --website={{ website }} \
+          --details="{{ details }}" \
+          --gas=500000 --gas-prices=99999ua0gi \
+          -y
+      register: validator_registration
+      failed_when: "'failed' in validator_registration.stderr"
+      changed_when: true
+
+    - name: Display validator registration output
+      ansible.builtin.debug:
+        var: validator_registration.stdout_lines
+
+    - name: Get the validator address
+      ansible.builtin.shell: 0gchaind keys show {{ wallet_name }} -a --bech val --keyring-backend test
+      register: validator_address
+      changed_when: false
+
+    - name: Display the validator address
+      ansible.builtin.debug:
+        msg: "The validator address is: {{ validator_address.stdout }}"

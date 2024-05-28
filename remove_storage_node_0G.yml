@@ -1,0 +1,24 @@
+---
+- name: Remove 0G Storage Node
+  hosts: localhost
+  become: true
+
+  tasks:
+    - name: Stop and disable ZGS service
+      ansible.builtin.systemd:
+        name: zgs-node
+        state: stopped
+        enabled: false
+      ignore_errors: true
+
+    - name: Remove 0G Storage Node files and configurations
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ ansible_env.HOME }}/0g-storage-node"
+        - "/etc/systemd/system/zgs-node.service"
+
+    - name: Reload systemd manager configuration
+      ansible.builtin.systemd:
+        daemon_reload: true

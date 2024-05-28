@@ -1,0 +1,143 @@
+---
+- name: Install 0G Validator Node
+  hosts: localhost
+  become: true
+
+  vars_prompt:
+    - name: moniker
+      prompt: "Enter your node name"
+      private: false
+
+  vars:
+    CHAIN_ID: "zgtendermint_16600-1"
+    RPC_PORT: "26657"
+
+  tasks:
+    - name: Install required packages
+      ansible.builtin.apt:
+        update_cache: yes
+        name:
+          - curl
+          - git
+          - jq
+          - build-essential
+          - gcc
+          - unzip
+          - wget
+          - lz4
+
+    - name: Install Go
+      ansible.builtin.shell: |
+        cd $HOME
+        ver="1.22.0"
+        wget "https://golang.org/dl/go$ver.linux-amd64.tar.gz"
+        sudo rm -rf /usr/local/go
+        sudo tar -C /usr/local -xzf "go$ver.linux-amd64.tar.gz"
+        rm "go$ver.linux-amd64.tar.gz"
+        echo "export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin" >> ~/.bash_profile
+        source ~/.bash_profile
+        go version
+      args:
+        executable: /bin/bash
+
+    - name: Build 0gchaind binary
+      ansible.builtin.git:
+        repo: 'https://github.com/0glabs/0g-chain.git'
+        dest: "{{ ansible_env.HOME }}/0g-chain"
+        version: "v0.1.0"
+
+    - name: Compile 0gchaind
+      ansible.builtin.shell: |
+        cd {{ ansible_env.HOME }}/0g-chain
+        make install
+        0gchaind version
+      args:
+        executable: /bin/bash
+
+    - name: Set up variables
+      ansible.builtin.shell: |
+        echo 'export MONIKER="{{ moniker }}"' >> ~/.bash_profile
+        echo 'export CHAIN_ID="{{ CHAIN_ID }}"' >> ~/.bash_profile
+        echo 'export WALLET_NAME="wallet"' >> ~/.bash_profile
+        echo 'export RPC_PORT="{{ RPC_PORT }}"' >> ~/.bash_profile
+        source ~/.bash_profile
+      args:
+        executable: /bin/bash
+
+    - name: Initialize the node
+      ansible.builtin.shell: |
+        0gchaind init $MONIKER --chain-id $CHAIN_ID
+        0gchaind config chain-id $CHAIN_ID
+        0gchaind config node tcp://localhost:$RPC_PORT
+        0gchaind config keyring-backend os
+      args:
+        executable: /bin/bash
+
+    - name: Download genesis.json
+      ansible.builtin.get_url:
+        url: "https://github.com/0glabs/0g-chain/releases/download/v0.1.0/genesis.json"
+        dest: "{{ ansible_env.HOME }}/.0gchain/config/genesis.json"
+
+    - name: Add seeds to config.toml
+      ansible.builtin.shell: |
+        SEEDS="c4d619f6088cb0b24b4ab43a0510bf9251ab5d7f@54.241.167.190:26656,44d11d4ba92a01b520923f51632d2450984d5886@54.176.175.48:26656,f2693dd86766b5bf8fd6ab87e2e970d564d20aff@54.193.250.204:26656,f878d40c538c8c23653a5b70f615f8dccec6fb9f@54.215.187.94:26656"
+        sed -i.bak -e "s/^seeds *=.*/seeds = \"${SEEDS}\"/" $HOME/.0gchain/config/config.toml
+      args:
+        executable: /bin/bash
+
+    - name: Change ports (Optional)
+      ansible.builtin.shell: |
+        EXTERNAL_IP=$(wget -qO- eth0.me)
+        PROXY_APP_PORT=26658
+        P2P_PORT=26656
+        PPROF_PORT=6060
+        API_PORT=1317
+        GRPC_PORT=9090
+        GRPC_WEB_PORT=9091
+        sed -i \
+            -e "s/\(proxy_app = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\1\2:$PROXY_APP_PORT\"/" \
+            -e "s/\(laddr = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\1\2:$RPC_PORT\"/" \
+            -e "s/\(pprof_laddr = \"\)\([^:]*\):\([0-9]*\).*/\1localhost:$PPROF_PORT\"/" \
+            -e "/\[p2p\]/,/^\[/{s/\(laddr = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\1\2:$P2P_PORT\"/}" \
+            -e "/\[p2p\]/,/^\[/{s/\(external_address = \"\)\([^:]*\):\([0-9]*\).*/\1${EXTERNAL_IP}:$P2P_PORT\"/; t; s/\(external_address = \"\).*/\1${EXTERNAL_IP}:$P2P_PORT\"/}" \
+            $HOME/.0gchain/config/config.toml
+        sed -i \
+            -e "/\[api\]/,/^\[/{s/\(address = \"tcp:\/\/\)\([^:]*\):\([0-9]*\)\(\".*\)/\1\2:$API_PORT\4/}" \
+            -e "/\[grpc\]/,/^\[/{s/\(address = \"\)\([^:]*\):\([0-9]*\)\(\".*\)/\1\2:$GRPC_PORT\4/}" \
+            -e "/\[grpc-web\]/,/^\[/{s/\(address = \"\)\([^:]*\):\([0-9]*\)\(\".*\)/\1\2:$GRPC_WEB_PORT\4/}" \
+            $HOME/.0gchain/config/app.toml
+      args:
+        executable: /bin/bash
+
+    - name: Configure pruning to save storage (Optional)
+      ansible.builtin.shell: |
+        sed -i \
+            -e "s/^pruning *=.*/pruning = \"custom\"/" \
+            -e "s/^pruning-keep-recent *=.*/pruning-keep-recent = \"100\"/" \
+            -e "s/^pruning-interval *=.*/pruning-interval = \"10\"/" \
+            "$HOME/.0gchain/config/app.toml"
+      args:
+        executable: /bin/bash
+
+    - name: Set min gas price
+      ansible.builtin.shell: |
+        sed -i "s/^minimum-gas-prices *=.*/minimum-gas-prices = \"0ua0gi\"/" $HOME/.0gchain/config/app.toml
+      args:
+        executable: /bin/bash
+
+    - name: Enable indexer (Optional)
+      ansible.builtin.shell: |
+        sed -i "s/^indexer *=.*/indexer = \"kv\"/" $HOME/.0gchain/config/config.toml
+      args:
+        executable: /bin/bash
+
+    - name: Create systemd service file for 0G Validator Node
+      ansible.builtin.template:
+        src: templates/0gd-node.service.j2
+        dest: /etc/systemd/system/0gd-node.service
+
+    - name: Enable and start 0G Validator Node service
+      ansible.builtin.systemd:
+        name: 0gd-node
+        enabled: true
+        state: started
