@@ -2,6 +2,7 @@
 - name: Create Wallet for 0G Validator Node
   hosts: localhost
   become: true
+
   vars_prompt:
     - name: wallet_name
       prompt: "Enter your wallet name"
@@ -10,21 +11,30 @@
   tasks:
     - name: Ensure wallet directory exists
       ansible.builtin.file:
-        path: "{{ ansible_env.HOME }}/0g-validator-node/run"
+        path: "{{ ansible_env.HOME }}/0gchaind/wallets"
         state: directory
         mode: '0755'
 
     - name: Add new wallet and store output
       ansible.builtin.shell: |
-        echo y | 0gchaind keys add {{ wallet_name }} --eth --keyring-backend test > {{ ansible_env.HOME }}/0g-validator-node/run/{{ wallet_name }}.info
+        0gchaind keys add {{ wallet_name }} --eth --keyring-backend test --output json > {{ ansible_env.HOME }}/0gchaind/wallets/{{ wallet_name }}.info
       args:
         executable: /bin/bash
 
-    - name: Display wallet creation output
-      ansible.builtin.command:
-        cmd: cat {{ ansible_env.HOME }}/0g-validator-node/run/{{ wallet_name }}.info
-      register: wallet_output
+    - name: Extract the HEX address for faucet request
+      ansible.builtin.shell: |
+        HEX_ADDRESS=$(0gchaind debug addr $(0gchaind keys show {{ wallet_name }} -a --keyring-backend test) | grep hex | awk '{print $3}')
+        echo "HEX Address: 0x$HEX_ADDRESS" >> {{ ansible_env.HOME }}/0gchaind/wallets/{{ wallet_name }}.info
+      args:
+        executable: /bin/bash
 
-    - name: Show wallet output
+    - name: Export private key and append to wallet info
+      ansible.builtin.shell: |
+        PRIVATE_KEY=$(echo y | 0gchaind keys unsafe-export-eth-key {{ wallet_name }} --keyring-backend test)
+        echo "Private key Ethereum: $PRIVATE_KEY" >> {{ ansible_env.HOME }}/0gchaind/wallets/{{ wallet_name }}.info
+      args:
+        executable: /bin/bash
+
+    - name: Display wallet info message
       ansible.builtin.debug:
-        msg: "{{ wallet_output.stdout }}"
+        msg: "Wallet created. You can find the wallet info, including the private key, seed phrase and hex address, at {{ ansible_env.HOME }}/0gchaind/wallets/{{ wallet_name }}.info"

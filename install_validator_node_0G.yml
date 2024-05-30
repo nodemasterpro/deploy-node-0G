@@ -11,6 +11,10 @@
   vars:
     CHAIN_ID: "zgtendermint_16600-1"
     RPC_PORT: "26657"
+    LOG_CONTRACT_ADDRESS: "0xb8F03061969da6Ad38f0a4a9f8a86bE71dA3c8E7"
+    MINE_CONTRACT: "0x96D90AAcb2D5Ab5C69c1c351B0a0F105aae490bE"
+    LOG_SYNC_START_BLOCK_NUMBER: 334797
+    BLOCKCHAIN_RPC_ENDPOINT: "https://evm-rpc-0g.mflow.tech"
 
   tasks:
     - name: Install required packages
@@ -54,21 +58,11 @@
       args:
         executable: /bin/bash
 
-    - name: Set up variables
-      ansible.builtin.shell: |
-        echo 'export MONIKER="{{ moniker }}"' >> ~/.bash_profile
-        echo 'export CHAIN_ID="{{ CHAIN_ID }}"' >> ~/.bash_profile
-        echo 'export WALLET_NAME="wallet"' >> ~/.bash_profile
-        echo 'export RPC_PORT="{{ RPC_PORT }}"' >> ~/.bash_profile
-        source ~/.bash_profile
-      args:
-        executable: /bin/bash
-
     - name: Initialize the node
       ansible.builtin.shell: |
-        0gchaind init $MONIKER --chain-id $CHAIN_ID
-        0gchaind config chain-id $CHAIN_ID
-        0gchaind config node tcp://localhost:$RPC_PORT
+        0gchaind init {{ moniker }} --chain-id {{ CHAIN_ID }}
+        0gchaind config chain-id {{ CHAIN_ID }}
+        0gchaind config node tcp://localhost:{{ RPC_PORT }}
         0gchaind config keyring-backend os
       args:
         executable: /bin/bash
@@ -128,6 +122,31 @@
     - name: Enable indexer (Optional)
       ansible.builtin.shell: |
         sed -i "s/^indexer *=.*/indexer = \"kv\"/" $HOME/.0gchain/config/config.toml
+      args:
+        executable: /bin/bash
+
+    - name: Increase the limit of open files
+      ansible.builtin.lineinfile:
+        path: /etc/security/limits.conf
+        line: "* soft nofile 65535\n* hard nofile 65535"
+        create: yes
+
+    - name: Set DefaultLimitNOFILE in systemd configuration
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/system.conf
+        line: "DefaultLimitNOFILE=65535"
+        create: yes
+
+    - name: Set DefaultLimitNOFILE in user systemd configuration
+      ansible.builtin.lineinfile:
+        path: /etc/systemd/user.conf
+        line: "DefaultLimitNOFILE=65535"
+        create: yes
+
+    - name: Reload systemd daemon
+      ansible.builtin.shell: |
+        systemctl daemon-reload
+        systemctl restart systemd-logind
       args:
         executable: /bin/bash
 

@@ -11,8 +11,10 @@
   vars:
     ZGS_LOG_DIR: "{{ ansible_env.HOME }}/0g-storage-node/run/log"
     ZGS_LOG_CONFIG_FILE: "{{ ansible_env.HOME }}/0g-storage-node/run/log_config"
-    LOG_CONTRACT_ADDRESS: "0x2b8bC93071A6f8740867A7544Ad6653AdEB7D919"
-    MINE_CONTRACT: "0x228aCfB30B839b269557214216eA4162db24445d"
+    LOG_CONTRACT_ADDRESS: "0xb8F03061969da6Ad38f0a4a9f8a86bE71dA3c8E7"
+    MINE_CONTRACT: "0x96D90AAcb2D5Ab5C69c1c351B0a0F105aae490bE"
+    LOG_SYNC_START_BLOCK_NUMBER: 334797
+    BLOCKCHAIN_RPC_ENDPOINT: "https://evm-rpc-0g.mflow.tech"
 
   tasks:
     - name: System updates and installation of required environments
@@ -108,7 +110,8 @@
         sed -i 's|# log_directory = "log"|log_directory = "{{ ZGS_LOG_DIR }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
         sed -i 's|mine_contract_address = ".*"|mine_contract_address = "{{ MINE_CONTRACT }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
         sed -i 's|log_contract_address = ".*"|log_contract_address = "{{ LOG_CONTRACT_ADDRESS }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
-        sed -i 's|blockchain_rpc_endpoint = "https://rpc-testnet.0g.ai"|blockchain_rpc_endpoint = "https://0g-evm.rpc.nodebrand.xyz"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|blockchain_rpc_endpoint = ".*"|blockchain_rpc_endpoint = "{{ BLOCKCHAIN_RPC_ENDPOINT }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|log_sync_start_block_number = ".*"|log_sync_start_block_number = {{ LOG_SYNC_START_BLOCK_NUMBER }}|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
         sed -i 's|# network_dir = "network"|network_dir = "network"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
         sed -i 's|# network_libp2p_port = 1234|network_libp2p_port = 1234|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
         sed -i 's|network_boot_nodes = \["/ip4/54.219.26.22/udp/1234/p2p/16Uiu2HAmPxGNWu9eVAQPJww79J32pTJLKGcpjRMb4Qb8xxKkyuG1","/ip4/52.52.127.117/udp/1234/p2p/16Uiu2HAm93Hd5azfhkGBbkx1zero3nYHvfjQYM2NtiW4R3r5bE2g"\]|network_boot_nodes = \["/ip4/54.219.26.22/udp/1234/p2p/16Uiu2HAmTVDGNhkHD98zDnJxQWu3i1FL1aFYeh9wiQTNu4pDCgps","/ip4/52.52.127.117/udp/1234/p2p/16Uiu2HAkzRjxK2gorngB1Xq84qDrT4hSVznYDHj6BkbaE4SGx9oS"\]|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
@@ -123,4 +126,4 @@
       ansible.builtin.systemd:
         name: zgs-node
         enabled: true
-        state: stopped
+        state: started
