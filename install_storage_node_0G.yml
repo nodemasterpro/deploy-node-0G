@@ -14,7 +14,6 @@
     LOG_CONTRACT_ADDRESS: "0xb8F03061969da6Ad38f0a4a9f8a86bE71dA3c8E7"
     MINE_CONTRACT: "0x96D90AAcb2D5Ab5C69c1c351B0a0F105aae490bE"
     LOG_SYNC_START_BLOCK_NUMBER: 334797
-    BLOCKCHAIN_RPC_ENDPOINT: "https://evm-rpc-0g.mflow.tech"
 
   tasks:
     - name: System updates and installation of required environments
@@ -80,6 +79,15 @@
       args:
         executable: /bin/bash
 
+    - name: Fetch external IP for RPC endpoint
+      ansible.builtin.shell: |
+        wget -qO- eth0.me
+      register: external_ip
+
+    - name: Set BLOCKCHAIN_RPC_ENDPOINT
+      set_fact:
+        BLOCKCHAIN_RPC_ENDPOINT: "http://{{ external_ip.stdout }}:8545"
+
     - name: Check if wallet info exists
       stat:
         path: "{{ ansible_env.HOME }}/0g-storage-node/run/{{ wallet_name }}.info"
@@ -99,6 +107,16 @@
         fi
         echo $PRIVATE_KEY
       register: private_key_output
+
+    - name: Ensure config.toml exists
+      stat:
+        path: "{{ ansible_env.HOME }}/0g-storage-node/run/config.toml"
+      register: config_toml_check
+
+    - name: Fail if config.toml does not exist
+      fail:
+        msg: "config.toml file does not exist."
+      when: not config_toml_check.stat.exists
 
     - name: Store private key in config
       ansible.builtin.shell: |
