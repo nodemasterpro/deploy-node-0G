@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=root
 Type=simple
-ExecStart={{ ansible_env.HOME }}/go/bin/0gchaind start --home {{ ansible_env.HOME }}/.0gchain
+ExecStart={{ ansible_env.HOME }}/go/bin/0gchaind start
 Restart=on-failure
 LimitNOFILE=65535
 
