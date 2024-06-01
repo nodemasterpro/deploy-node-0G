@@ -97,7 +97,7 @@
         GRPC_WEB_PORT=9091
         sed -i \
             -e "s/\(proxy_app = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\1\2:$PROXY_APP_PORT\"/" \
-            -e "s/\(laddr = \"tcp:\/\/\)\([^:]*\)\(:\([0-9]*\)\)\{0,1\}.*/\1localhost:$RPC_PORT\"/" \
+            -e "s/\(laddr = \"\)\([^:]*\):\([0-9]*\).*/\1localhost:$RPC_PORT\"/" \
             -e "s/\(pprof_laddr = \"\)\([^:]*\):\([0-9]*\).*/\1localhost:$PPROF_PORT\"/" \
             -e "/\[p2p\]/,/^\[/{s/\(laddr = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\1\2:$P2P_PORT\"/}" \
             -e "/\[p2p\]/,/^\[/{s/\(external_address = \"\)\([^:]*\):\([0-9]*\).*/\1${EXTERNAL_IP}:$P2P_PORT\"/; t; s/\(external_address = \"\).*/\1${EXTERNAL_IP}:$P2P_PORT\"/}" \
