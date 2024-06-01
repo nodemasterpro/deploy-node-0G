@@ -26,6 +26,12 @@
         state: absent
       ignore_errors: true
 
+    - name: Remove 0G Validator Node state directory
+      ansible.builtin.shell: |
+        rm -rf /run/systemd/system/0gd-node.service
+        rm -rf /etc/systemd/system/0gd-node.service
+      ignore_errors: true
+
     - name: Remove 0G Validator Node data directory
       ansible.builtin.file:
         path: "{{ ansible_env.HOME }}/.0gchain"
@@ -52,8 +58,9 @@
       ignore_errors: true
 
     - name: Reload systemd to apply changes
-      ansible.builtin.systemd:
-        daemon_reload: true
+      ansible.builtin.shell: |
+        systemctl daemon-reload
+        systemctl reset-failed
       ignore_errors: true
 
     - name: Display message
