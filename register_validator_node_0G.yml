@@ -63,20 +63,4 @@
       ansible.builtin.debug:
         msg: "{{ validator_creation.stdout }}"
 
-    - name: Delegate tokens
-      ansible.builtin.shell: |
-        0gchaind tx staking delegate $(0gchaind keys show {{ wallet_name }} --bech val -a --keyring-backend {{ KEYRING_BACKEND }}) 1000000ua0gi --from {{ wallet_name }} --keyring-backend {{ KEYRING_BACKEND }} -y
-      register: delegation
 
-    - name: Display delegation output
-      ansible.builtin.debug:
-        msg: "{{ delegation.stdout }}"
-
-    - name: Query validator state
-      ansible.builtin.shell: |
-        0gchaind q staking validator $(0gchaind keys show {{ wallet_name }} --bech val -a --keyring-backend {{ KEYRING_BACKEND }})
-      register: validator_state
-
-    - name: Display validator state
-      ansible.builtin.debug:
-        msg: "{{ validator_state.stdout }}"
