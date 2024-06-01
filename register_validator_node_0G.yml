@@ -41,7 +41,7 @@
     - name: Create validator
       ansible.builtin.shell: |
         0gchaind tx staking create-validator \
-          --amount=1000000ua0gi \
+          --amount=1000ua0gi \
           --pubkey=$(0gchaind tendermint show-validator) \
           --moniker={{ moniker }} \
           --chain-id={{ CHAIN_ID }} \
