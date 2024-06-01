@@ -188,12 +188,17 @@
       ansible.builtin.systemd:
         name: 0gd-node
         enabled: true
-        state: stopped
+        state: started
 
     - name: Download latest snapshot
       ansible.builtin.get_url:
         url: "{{ SNAPSHOT_URL }}"
         dest: "{{ ansible_env.HOME }}/latest_snapshot.tar.lz4"
+
+    - name: Stop 0G Validator Node service
+      ansible.builtin.systemd:
+        name: 0gd-node
+        state: stopped    
 
     - name: Backup priv_validator_state.json
       ansible.builtin.shell: |
