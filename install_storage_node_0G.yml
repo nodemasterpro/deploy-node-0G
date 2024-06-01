@@ -24,14 +24,6 @@
           - cmake
           - build-essential
 
-    - name: Install Go
-      ansible.builtin.shell: |
-        wget https://go.dev/dl/go1.22.0.linux-amd64.tar.gz
-        sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.22.0.linux-amd64.tar.gz
-        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bash_profile
-      args:
-        executable: /bin/bash
-
     - name: Install Rustup
       ansible.builtin.shell: |
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y

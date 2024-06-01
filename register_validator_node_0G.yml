@@ -63,4 +63,3 @@
       ansible.builtin.debug:
         msg: "{{ validator_creation.stdout }}"
 
-
