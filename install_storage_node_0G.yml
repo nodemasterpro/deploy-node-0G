@@ -70,7 +70,7 @@
 
     - name: Set BLOCKCHAIN_RPC_ENDPOINT
       set_fact:
-        BLOCKCHAIN_RPC_ENDPOINT: "http://{{ external_ip.stdout }}:8545"
+        BLOCKCHAIN_RPC_ENDPOINT: "https://rpc-testnet.0g.ai"
 
     - name: Check if wallet info exists
       stat:
