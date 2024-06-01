@@ -52,8 +52,9 @@
           --from={{ wallet_name }} \
           --identity="" \
           --website="" \
-          --details="0G to the moon!" \
-          --gas=500000 --gas-prices=99999ua0gi \
+          --details="I like 0G project" \
+          --gas=auto \
+          --gas-adjustment=1.4 \
           --keyring-backend {{ KEYRING_BACKEND }} \
           -y
       register: validator_creation
