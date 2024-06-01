@@ -4,50 +4,58 @@
   become: true
 
   tasks:
-    - name: Stop and disable 0G Validator Node service
+    - name: Stop 0G Validator Node service
       ansible.builtin.systemd:
         name: 0gd-node
         state: stopped
         enabled: false
-      ignore_errors: true  
+      ignore_errors: true
+
+    - name: Kill any remaining 0G Validator Node processes
+      ansible.builtin.shell: |
+        pkill -f 0gd-node
+      ignore_errors: true
+
+    - name: Wait for any remaining processes to terminate
+      ansible.builtin.wait_for:
+        timeout: 30
 
     - name: Remove 0G Validator Node service file
       ansible.builtin.file:
         path: /etc/systemd/system/0gd-node.service
         state: absent
-      ignore_errors: true  
+      ignore_errors: true
 
     - name: Remove 0G Validator Node data directory
       ansible.builtin.file:
         path: "{{ ansible_env.HOME }}/.0gchain"
         state: absent
-      ignore_errors: true  
+      ignore_errors: true
 
     - name: Remove 0g-chain repository
       ansible.builtin.file:
         path: "{{ ansible_env.HOME }}/0g-chain"
         state: absent
-      ignore_errors: true  
+      ignore_errors: true
 
     - name: Remove Go binary
       ansible.builtin.file:
         path: /usr/local/go
         state: absent
-      ignore_errors: true  
+      ignore_errors: true
 
     - name: Remove Go bin from PATH in .bash_profile
       ansible.builtin.lineinfile:
         path: ~/.bash_profile
         regexp: 'export PATH=\$PATH:/usr/local/go/bin:\$HOME/go/bin'
         state: absent
-      ignore_errors: true  
+      ignore_errors: true
 
     - name: Reload systemd to apply changes
       ansible.builtin.systemd:
         daemon_reload: true
-      ignore_errors: true  
+      ignore_errors: true
 
     - name: Display message
       ansible.builtin.debug:
         msg: "0G Validator Node has been removed successfully."
-      ignore_errors: true  
