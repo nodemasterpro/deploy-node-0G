@@ -98,9 +98,9 @@
         RPC_PORT=26657
         sed -i \
             -e "s/\(proxy_app = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\1\2:$PROXY_APP_PORT\"/" \
-            -e "s/\(laddr = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\10.0.0.0:$RPC_PORT\"/" \
+            -e "s/^laddr = \".*/laddr = \"tcp:\/\/0.0.0.0:$RPC_PORT\"/" \
             -e "s/\(pprof_laddr = \"\)\([^:]*\):\([0-9]*\).*/\1localhost:$PPROF_PORT\"/" \
-            -e "/\[p2p\]/,/^\[/{s/\(laddr = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\1\2:$P2P_PORT\"/}" \
+            -e "/\[p2p\]/,/^\[/{s/\(laddr = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\10.0.0.0:$P2P_PORT\"/}" \
             -e "/\[p2p\]/,/^\[/{s/\(external_address = \"\)\([^:]*\):\([0-9]*\).*/\1${EXTERNAL_IP}:$P2P_PORT\"/; t; s/\(external_address = \"\).*/\1${EXTERNAL_IP}:$P2P_PORT\"/}" \
             $HOME/.0gchain/config/config.toml
         sed -i \
