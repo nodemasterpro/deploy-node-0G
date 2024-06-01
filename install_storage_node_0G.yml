@@ -38,14 +38,6 @@
       args:
         executable: /bin/bash
 
-    - name: Clone and install 0gchaind
-      ansible.builtin.shell: |
-        git clone -b v0.1.0 https://github.com/0glabs/0g-chain.git
-        ./0g-chain/networks/testnet/install.sh
-        echo 'export PATH=$PATH:{{ ansible_env.HOME }}/go/bin' >> ~/.profile
-        source ~/.profile
-      args:
-        executable: /bin/bash
 
     - name: Clone the 0G Storage Node repository
       ansible.builtin.git:
@@ -90,7 +82,7 @@
 
     - name: Check if wallet info exists
       stat:
-        path: "{{ ansible_env.HOME }}/0g-storage-node/run/{{ wallet_name }}.info"
+        path: "{{ ansible_env.HOME }}/0gchaind/wallets/{{ wallet_name }}.info"
       register: wallet_info_check
 
     - name: Fail if wallet info does not exist
