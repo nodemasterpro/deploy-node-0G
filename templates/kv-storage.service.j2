@@ -1,0 +1,14 @@
+[Unit]
+Description=ZGS KV Node
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory={{ CONFIG_DIR }}
+ExecStart={{ STORAGE_KV_DIR }}/target/release/zgs_kv --config {{ CONFIG_FILE }}
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

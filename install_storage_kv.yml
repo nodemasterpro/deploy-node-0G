@@ -1,0 +1,83 @@
+---
+- name: Install 0G Storage KV Node
+  hosts: localhost
+  become: true
+
+  vars:
+    STORAGE_KV_DIR: "{{ ansible_env.HOME }}/0g-storage-kv"
+    CONFIG_DIR: "{{ STORAGE_KV_DIR }}/run"
+    CONFIG_EXAMPLE_FILE: "{{ CONFIG_DIR }}/config_example.toml"
+    CONFIG_FILE: "{{ CONFIG_DIR }}/config.toml"
+    BLOCKCHAIN_RPC_ENDPOINT: "https://0g-rpc.dongqn.com"
+    LOG_CONTRACT_ADDRESS: "0xb8F03061969da6Ad38f0a4a9f8a86bE71dA3c8E7"
+    LOG_SYNC_START_BLOCK_NUMBER: 334797
+
+  tasks:
+    - name: System updates and installation of required environments
+      ansible.builtin.apt:
+        update_cache: yes
+        name:
+          - clang
+          - cmake
+          - build-essential
+          - wget
+        state: present
+
+    - name: Install Rustup
+      ansible.builtin.shell: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      args:
+        executable: /bin/bash
+
+    - name: Clone the 0G Storage KV repository
+      ansible.builtin.git:
+        repo: 'https://github.com/0glabs/0g-storage-kv.git'
+        dest: "{{ STORAGE_KV_DIR }}"
+        version: "main"
+        force: yes
+
+    - name: Build the 0G Storage KV Node
+      ansible.builtin.shell: |
+        cd {{ STORAGE_KV_DIR }}
+        git submodule update --init
+        sudo apt install -y cargo
+        cargo build --release
+      args:
+        executable: /bin/bash
+
+    - name: Ensure config directory exists
+      ansible.builtin.file:
+        path: "{{ CONFIG_DIR }}"
+        state: directory
+
+    - name: Copy config_example.toml to config.toml
+      ansible.builtin.copy:
+        src: "{{ CONFIG_EXAMPLE_FILE }}"
+        dest: "{{ CONFIG_FILE }}"
+        remote_src: yes
+
+    - name: Fetch external IP for RPC endpoint
+      ansible.builtin.shell: |
+        wget -qO- eth0.me
+      register: external_ip
+
+    - name: Update config.toml with external IP
+      ansible.builtin.shell: |
+        sed -i 's|rpc_listen_address = ".*"|rpc_listen_address = "http://{{ external_ip.stdout }}:6789"|' {{ CONFIG_FILE }}
+        sed -i 's|zgs_node_urls = ".*"|zgs_node_urls = "http://{{ external_ip.stdout }}:5678"|' {{ CONFIG_FILE }}
+        sed -i 's|blockchain_rpc_endpoint = ".*"|blockchain_rpc_endpoint = "{{ BLOCKCHAIN_RPC_ENDPOINT }}"|' {{ CONFIG_FILE }}
+        sed -i 's|log_contract_address = ".*"|log_contract_address = "{{ LOG_CONTRACT_ADDRESS }}"|' {{ CONFIG_FILE }}
+        sed -i 's|log_sync_start_block_number = ".*"|log_sync_start_block_number = {{ LOG_SYNC_START_BLOCK_NUMBER }}|' {{ CONFIG_FILE }}
+
+    - name: Create systemd service file for 0G Storage KV Node
+      ansible.builtin.template:
+        src: templates/kv-storage.service.j2
+        dest: /etc/systemd/system/zgs-kv.service
+
+    - name: Enable and start ZGS KV service
+      ansible.builtin.systemd:
+        name: zgs-kv
+        enabled: true
+        state: stopped
+
+
