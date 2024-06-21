@@ -8,7 +8,7 @@
     CONFIG_DIR: "{{ STORAGE_KV_DIR }}/run"
     CONFIG_EXAMPLE_FILE: "{{ CONFIG_DIR }}/config_example.toml"
     CONFIG_FILE: "{{ CONFIG_DIR }}/config.toml"
-    BLOCKCHAIN_RPC_ENDPOINT: "https://0g-rpc.dongqn.com"
+    BLOCKCHAIN_RPC_ENDPOINT: "http://127.0.0.1:8545"
     LOG_CONTRACT_ADDRESS: "0xb8F03061969da6Ad38f0a4a9f8a86bE71dA3c8E7"
     LOG_SYNC_START_BLOCK_NUMBER: 334797
 
@@ -63,7 +63,7 @@
 
     - name: Update config.toml with external IP
       ansible.builtin.shell: |
-        sed -i 's|rpc_listen_address = ".*"|rpc_listen_address = "http://{{ external_ip.stdout }}:6789"|' {{ CONFIG_FILE }}
+        sed -i 's|rpc_listen_address = ".*"|rpc_listen_address = "{{ external_ip.stdout }}:6789"|' {{ CONFIG_FILE }}
         sed -i 's|zgs_node_urls = ".*"|zgs_node_urls = "http://{{ external_ip.stdout }}:5678"|' {{ CONFIG_FILE }}
         sed -i 's|blockchain_rpc_endpoint = ".*"|blockchain_rpc_endpoint = "{{ BLOCKCHAIN_RPC_ENDPOINT }}"|' {{ CONFIG_FILE }}
         sed -i 's|log_contract_address = ".*"|log_contract_address = "{{ LOG_CONTRACT_ADDRESS }}"|' {{ CONFIG_FILE }}

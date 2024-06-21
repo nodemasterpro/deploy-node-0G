@@ -119,6 +119,20 @@ To monitor your 0G storage node's activity:
 tail -f /root/0g-storage-node/run/log/zgs.log.*
 ```
 
+## Step 12: Installing the 0G Storage KV Node
+The 0G Storage KV Node is essential for key-value stream operations in the 0G network. To install the storage KV node, run the following command:
+
+```
+ansible-playbook install_storage_kv_node_0G.yml
+```
+
+## Step 13: Viewing Storage KV Node Logs
+To view the logs for the 0G storage KV node:
+
+```
+journalctl -u zgs-kv -f -o cat
+```
+
 ## Additional Information
 ### Stopping Service
 To stop the 0G validator node:
@@ -131,6 +145,13 @@ To stop the 0G storage node:
 ```
 systemctl stop zgs-node
 ```
+
+To stop the 0G storage KV node:
+
+```
+systemctl stop zgs-kv
+```
+
 ### Starting Service
 To start the 0G validator node:
 
@@ -142,6 +163,13 @@ To start the 0G storage node:
 ```
 systemctl start zgs-node
 ```
+
+To start the 0G storage KV node:
+
+```
+systemctl start zgs-kv
+```
+
 Note: To start the storage node, the validator node must be started.
 
 ### Removing the 0G Validator Node and Storage Node
@@ -150,11 +178,13 @@ To remove the 0G validator node, run this playbook:
 ```
 ansible-playbook remove_validator_node_0G.yml
 ```
+
 To remove the 0G storage node, run this playbook:
 
 ```
 ansible-playbook remove_storage_node_0G.yml
 ```
+
 Ensure to back up all important data before deleting the 0G nodes, as this action may remove node data.
 
 By following this guide, you have successfully deployed and managed 0G validator and storage nodes, contributing to the robustness of the network and potentially earning rewards. Join the 0G community on Discord and Twitter to stay informed about the project.
