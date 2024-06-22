@@ -78,6 +78,6 @@
       ansible.builtin.systemd:
         name: zgs-kv
         enabled: true
-        state: stopped
+        state: started
 
 
