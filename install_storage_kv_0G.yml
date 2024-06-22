@@ -67,7 +67,7 @@
         sed -i 's|zgs_node_urls = ".*"|zgs_node_urls = "http://{{ external_ip.stdout }}:5678"|' {{ CONFIG_FILE }}
         sed -i 's|blockchain_rpc_endpoint = ".*"|blockchain_rpc_endpoint = "{{ BLOCKCHAIN_RPC_ENDPOINT }}"|' {{ CONFIG_FILE }}
         sed -i 's|log_contract_address = ".*"|log_contract_address = "{{ LOG_CONTRACT_ADDRESS }}"|' {{ CONFIG_FILE }}
-        sed -i 's|log_sync_start_block_number = ".*"|log_sync_start_block_number = {{ LOG_SYNC_START_BLOCK_NUMBER }}|' {{ CONFIG_FILE }}
+         sed -i 's|log_sync_start_block_number = .*|log_sync_start_block_number = {{ LOG_SYNC_START_BLOCK_NUMBER }}|' {{ CONFIG_FILE }}
 
     - name: Create systemd service file for 0G Storage KV Node
       ansible.builtin.template:
