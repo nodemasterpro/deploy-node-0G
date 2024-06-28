@@ -35,7 +35,7 @@
       ansible.builtin.git:
         repo: 'https://github.com/0glabs/0g-storage-node.git'
         dest: "{{ ansible_env.HOME }}/0g-storage-node"
-        version: "tags/v0.2.0"
+        version: "tags/v0.3.2"
         force: yes
 
     - name: Build the 0G Storage Node
