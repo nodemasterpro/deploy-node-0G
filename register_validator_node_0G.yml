@@ -12,7 +12,7 @@
       private: false
 
   vars:
-    CHAIN_ID: "zgtendermint_16600-1"
+    CHAIN_ID: "zgtendermint_16600-2"
     KEYRING_BACKEND: "test"
 
   tasks:
