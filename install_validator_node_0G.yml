@@ -1,5 +1,5 @@
 ---
-- name: Install 0G Validator Node
+- name: Deploy Allora Validator Node using Ansible
   hosts: localhost
   become: true
 
@@ -9,240 +9,236 @@
       private: false
 
   vars:
-    CHAIN_ID: "zgtendermint_16600-2"
-    KEYRING_BACKEND: "os"
-    RPC_PORT: "26657"
-    SEEDS: "59df4b3832446cd0f9c369da01f2aa5fe9647248@162.55.65.137:27956"
-    PERSISTENT_PEERS: "6dbb0450703d156d75db57dd3e51dc260a699221@152.53.47.155:13456,df4cc52fa0fcdd5db541a28e4b5a9c6ce1076ade@37.60.246.110:13456,54c269f44e1a9c3fd00fe62db52ac08e59b148f7@85.239.232.29:13456,dbfb5240845c8c7d2865a35e9f361cc42877721f@78.46.40.246:34656,386c82b09e0ec6a68e653a5d6c57f766ae73e0df@194.163.183.208:26656,d5e294d6d5439f5bd63d1422423d7798492e70fd@77.237.232.146:26656,48e3cab55ba7a1bc8ea940586e4718a857de84c4@178.63.4.186:26656,3bd6c0c825470d07cd49e57d0b650d490cc48527@37.60.253.166:26656,6efd3559f5d9d13e6442bc2fc9b17e50dc800970@91.205.104.91:13456,3b3ddcd4de429456177b29e5ca0febe4f4c21989@75.119.139.198:26656,58702cc91cc456e9beeb9b3e381f23fac39a3311@94.16.31.30:13456,e7c8f15c88ec1d6dc2b3a9ab619519fbd61182d6@217.76.54.13:26656,7e6124b7816c2fddd1e0f08bbaf0b6876230c5f4@37.27.120.13:26656,d82f58230074dccc8371f05df35c3e8d71ece034@69.67.150.107:23656,537abd857a3335e46e0f010cc01bde94854691a4@5.252.55.236:13456"
-    SNAPSHOT_URL: "https://snapshots-testnet.nodejumper.io/0g-testnet/0g-testnet_latest.tar.lz4"
-    HOME_DIR: "{{ ansible_env.HOME }}/.0gchain"
-
+    NETWORK: testnet
+    GENESIS_URL: "https://raw.githubusercontent.com/allora-network/networks/main/{{ NETWORK }}/genesis.json"
+    SEEDS_URL: "https://raw.githubusercontent.com/allora-network/networks/main/{{ NETWORK }}/seeds.txt"
+    APP_HOME: "/root/.allorad"
+    INIT_FLAG: "{{ APP_HOME }}/.initialized"
+    KEYRING_BACKEND: test
+    GENESIS_FILE: "{{ APP_HOME }}/config/genesis.json"
+    DENOM: uallo
+    SEEDS_FILE: "/tmp/seeds.txt"
+    GO_VERSION: "1.22.4"
 
   tasks:
-    - name: Install required packages
-      ansible.builtin.apt:
+    - name: Debug moniker variable
+      debug:
+        msg: "Moniker is set to {{ moniker }}"
+
+    - name: Update and upgrade apt packages
+      apt:
         update_cache: yes
+        upgrade: 'yes'
+
+    - name: Install required packages
+      apt:
         name:
           - curl
-          - snapd
           - git
           - jq
+          - wget
           - build-essential
           - gcc
-          - unzip
-          - wget
           - lz4
+        state: present
 
-    - name: Install Go
-      ansible.builtin.shell: |
-        wget https://go.dev/dl/go1.22.4.linux-amd64.tar.gz
-        sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
-        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bash_profile
+    - name: Download Go archive
+      get_url:
+        url: "https://golang.org/dl/go{{ GO_VERSION }}.linux-amd64.tar.gz"
+        dest: "/tmp/go{{ GO_VERSION }}.linux-amd64.tar.gz"
+
+    - name: Extract Go archive to /usr/local
+      ansible.builtin.unarchive:
+        src: "/tmp/go{{ GO_VERSION }}.linux-amd64.tar.gz"
+        dest: /usr/local
+        remote_src: yes
+
+    - name: Clean up the downloaded Go archive
+      file:
+        path: "/tmp/go{{ GO_VERSION }}.linux-amd64.tar.gz"
+        state: absent
+
+    - name: Add Go to PATH in .bash_profile
+      lineinfile:
+        path: /root/.bash_profile
+        line: 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin'
+        create: yes
+
+    - name: Source profile for Go
+      shell: source /root/.bash_profile
       args:
         executable: /bin/bash
 
-    - name: Set timezone to UTC
-      ansible.builtin.command:
-        cmd: timedatectl set-timezone UTC
+    - name: Verify Go installation
+      command: /usr/local/go/bin/go version
+      register: go_version
 
-    - name: Clone 0G chain repository
-      ansible.builtin.git:
-        repo: 'https://github.com/0glabs/0g-chain.git'
-        dest: "{{ ansible_env.HOME }}/0g-chain"
-        version: "v0.2.3"
+    - name: Print Go version
+      debug:
+        msg: "{{ go_version.stdout }}"
 
-    - name: Run install script
-      ansible.builtin.shell: |
-        cd {{ ansible_env.HOME }}/0g-chain/networks/testnet
-        ./install.sh
+    - name: Clone Allora Chain repository
+      git:
+        repo: 'https://github.com/allora-network/allora-chain.git'
+        dest: "{{ ansible_env.HOME }}/allora-chain"
+        version: "tags/v0.0.10"
+
+    - name: Run make install
+      shell: |
+        cd {{ ansible_env.HOME }}/allora-chain
+        make install
       args:
         executable: /bin/bash
 
-    - name: Source profile
-      ansible.builtin.shell: |
-        source $HOME/.profile
-      args:
-        executable: /bin/bash
+    - name: Ensure APP_HOME directory exists
+      file:
+        path: "{{ APP_HOME }}"
+        state: directory
 
-    - name: Set Chain ID
-      ansible.builtin.shell: |
-        0gchaind config chain-id {{ CHAIN_ID }}
-      args:
-        executable: /bin/bash
+    - name: Remove existing configuration if not initialized
+      shell: rm -rf {{ APP_HOME }}/config
+      when: not (INIT_FLAG | bool)
 
     - name: Initialize the node
-      ansible.builtin.shell: |
-        0gchaind init {{ moniker }} --chain-id {{ CHAIN_ID }}
-      args:
-        executable: /bin/bash
+      shell: allorad --home {{ APP_HOME }} init {{ moniker }} --chain-id {{ NETWORK }} --default-denom {{ DENOM }}
+      when: not (INIT_FLAG | bool)
 
-    - name: Set keyring-backend
-      ansible.builtin.shell: |
-        0gchaind config keyring-backend {{ KEYRING_BACKEND }}
-      args:
-        executable: /bin/bash   
+    - name: Download genesis file
+      get_url:
+        url: "{{ GENESIS_URL }}"
+        dest: "{{ GENESIS_FILE }}"
+      when: not (INIT_FLAG | bool)
 
-    - name: Download genesis.json
-      ansible.builtin.shell: |
-        sudo apt install -y unzip wget
-        rm ~/.0gchain/config/genesis.json
-        wget -P ~/.0gchain/config https://github.com/0glabs/0g-chain/releases/download/v0.2.3/genesis.json
-      args:
-        executable: /bin/bash
+    - name: Configure allorad client
+      shell: allorad --home={{ APP_HOME }} config set client chain-id {{ NETWORK }}
+      when: not (INIT_FLAG | bool)
 
-    - name: Validate genesis file
-      ansible.builtin.shell: |
-        0gchaind validate-genesis
-      args:
-        executable: /bin/bash
+    - name: Set keyring-backend for allorad client
+      shell: allorad --home={{ APP_HOME }} config set client keyring-backend {{ KEYRING_BACKEND }}
+      when: not (INIT_FLAG | bool)
 
-    - name: Add seeds to config.toml
-      ansible.builtin.shell: |
-        sed -i.bak -e "s/^seeds *=.*/seeds = \"{{ SEEDS }}\"/" {{ ansible_env.HOME }}/.0gchain/config/config.toml
-      args:
-        executable: /bin/bash
+    - name: Create symlink for allorad config
+      file:
+        src: "{{ APP_HOME }}"
+        dest: "{{ APP_HOME }}/.allorad"
+        state: link
+      when: not (INIT_FLAG | bool)
 
-    - name: Add persistent peers to config.toml
-      ansible.builtin.shell: |
-        sed -i.bak -e "s/^persistent_peers *=.*/persistent_peers = \"{{ PERSISTENT_PEERS }}\"/" {{ ansible_env.HOME }}/.0gchain/config/config.toml
-      args:
-        executable: /bin/bash
+    - name: Create init flag
+      file:
+        path: "{{ INIT_FLAG }}"
+        state: touch
+      when: not (INIT_FLAG | bool)
 
-    - name: Change ports (Optional)
-      ansible.builtin.shell: |
-        EXTERNAL_IP=$(wget -qO- eth0.me)
-        PROXY_APP_PORT=26658
-        P2P_PORT=26656
-        PPROF_PORT=6060
-        API_PORT=1317
-        GRPC_PORT=9090
-        GRPC_WEB_PORT=9091
-        RPC_PORT=26657
-        sed -i \
-            -e "s/\(proxy_app = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\1\2:$PROXY_APP_PORT\"/" \
-            -e "s/^laddr = \".*/laddr = \"tcp:\/\/0.0.0.0:$RPC_PORT\"/" \
-            -e "s/\(pprof_laddr = \"\)\([^:]*\):\([0-9]*\).*/\1localhost:$PPROF_PORT\"/" \
-            -e "/\[p2p\]/,/^\[/{s/\(laddr = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\10.0.0.0:$P2P_PORT\"/}" \
-            -e "/\[p2p\]/,/^\[/{s/\(external_address = \"\)\([^:]*\):\([0-9]*\).*/\1${EXTERNAL_IP}:$P2P_PORT\"/; t; s/\(external_address = \"\).*/\1${EXTERNAL_IP}:$P2P_PORT\"/}" \
-            $HOME/.0gchain/config/config.toml
-        sed -i \
-            -e "/\[api\]/,/^\[/{s/\(address = \"tcp:\/\/\)\([^:]*\):\([0-9]*\)\(\".*\)/\1\2:$API_PORT\4/}" \
-            -e "/\[grpc\]/,/^\[/{s/\(address = \"\)\([^:]*\):\([0-9]*\)\(\".*\)/\1\2:$GRPC_PORT\4/}" \
-            -e "/\[grpc-web\]/,/^\[/{s/\(address = \"\)\([^:]*\):\([0-9]*\)\(\".*\)/\1\2:$GRPC_WEB_PORT\4/}" \
-            $HOME/.0gchain/config/app.toml
-      args:
-        executable: /bin/bash
+    - name: Download seeds file
+      get_url:
+        url: "{{ SEEDS_URL }}"
+        dest: "{{ SEEDS_FILE }}"
 
-    - name: Configure EVM RPC and WebSocket addresses
-      ansible.builtin.shell: |
-        sed -i 's/^address = "127.0.0.1:8545"/address = "0.0.0.0:8545"/' {{ ansible_env.HOME }}/.0gchain/config/app.toml
-        sed -i 's/^ws-address = "127.0.0.1:8546"/ws-address = "0.0.0.0:8546"/' {{ ansible_env.HOME }}/.0gchain/config/app.toml
-      args:
-        executable: /bin/bash
+    - name: Read seeds from file
+      slurp:
+        src: "{{ SEEDS_FILE }}"
+      register: seeds_content
 
-    - name: Configure pruning to save storage (Optional)
+    - name: Decode seeds content
+      set_fact:
+        seeds: "{{ seeds_content.content | b64decode }}"
+
+    - name: Configure pruning to save storage
       ansible.builtin.shell: |
         sed -i \
             -e "s/^pruning *=.*/pruning = \"custom\"/" \
             -e "s/^pruning-keep-recent *=.*/pruning-keep-recent = \"100\"/" \
+            -e "s/^pruning-keep-every *=.*/pruning-keep-every = \"0\"/" \
             -e "s/^pruning-interval *=.*/pruning-interval = \"10\"/" \
-            "$HOME/.0gchain/config/app.toml"
+            "{{ APP_HOME }}/config/app.toml"
       args:
         executable: /bin/bash
 
-    - name: Set min gas price
+    - name: Configure indexer to null
       ansible.builtin.shell: |
-        sed -i "s/^minimum-gas-prices *=.*/minimum-gas-prices = \"0ua0gi\"/" $HOME/.0gchain/config/app.toml
+        sed -i "s/^indexer *=.*/indexer = \"null\"/" {{ APP_HOME }}/config/config.toml
       args:
         executable: /bin/bash
 
-    - name: Enable indexer (Optional)
+    - name: Change ports in config.toml
       ansible.builtin.shell: |
-        sed -i "s/^indexer *=.*/indexer = \"kv\"/" $HOME/.0gchain/config/config.toml
+        sed -i "s/^laddr = \"tcp:\/\/0.0.0.0:26656\"/laddr = \"tcp:\/\/0.0.0.0:26666\"/" {{ APP_HOME }}/config/config.toml
+        sed -i "s/^laddr = \"tcp:\/\/127.0.0.1:26657\"/laddr = \"tcp:\/\/127.0.0.1:26667\"/" {{ APP_HOME }}/config/config.toml
+        sed -i "s/^pprof_laddr = \"localhost:6060\"/pprof_laddr = \"localhost:6061\"/" {{ APP_HOME }}/config/config.toml
       args:
         executable: /bin/bash
 
-    - name: Ensure fs.inotify.max_user_instances is set to 256
-      ansible.builtin.sysctl:
-        name: fs.inotify.max_user_instances
-        value: 256
-        state: present
-        reload: yes    
+    - name: Change port in client.toml
+      ansible.builtin.shell: |
+        sed -i "s/^node = \"tcp:\/\/localhost:26657\"/node = \"tcp:\/\/localhost:26667\"/" {{ APP_HOME }}/config/client.toml
+      args:
+        executable: /bin/bash
 
-    - name: Increase the limit of open files
-      ansible.builtin.lineinfile:
-        path: /etc/security/limits.conf
-        line: "* soft nofile 65535\n* hard nofile 65535"
-        create: yes
-
-    - name: Set DefaultLimitNOFILE in systemd configuration
-      ansible.builtin.lineinfile:
-        path: /etc/systemd/system.conf
-        line: "DefaultLimitNOFILE=65535"
-        create: yes
-
-    - name: Set DefaultLimitNOFILE in user systemd configuration
-      ansible.builtin.lineinfile:
-        path: /etc/systemd/user.conf
-        line: "DefaultLimitNOFILE=65535"
-        create: yes
+    - name: Create systemd service file from template
+      template:
+        src: templates/allora-node.service.j2
+        dest: /etc/systemd/system/allora-node.service
+      vars:
+        app_home: "{{ APP_HOME }}"
+        moniker: "{{ moniker }}"
+        denom: "{{ DENOM }}"
+        seeds: "{{ seeds }}"
 
     - name: Reload systemd daemon
-      ansible.builtin.shell: |
-        systemctl daemon-reload
-        systemctl restart systemd-logind
-      args:
-        executable: /bin/bash
+      systemd:
+        daemon_reload: true
 
-    - name: Create systemd service file for 0G Validator Node
-      ansible.builtin.template:
-        src: templates/0gd-node.service.j2
-        dest: /etc/systemd/system/0gd-node.service
-
-    - name: Enable and start 0G Validator Node service
-      ansible.builtin.systemd:
-        name: 0gd-node
+    - name: Enable and start Allora Node service
+      systemd:
+        name: allora-node
         enabled: true
         state: started
 
-    #- name: Download latest snapshot
-    #  ansible.builtin.get_url:
-    #    url: "{{ SNAPSHOT_URL }}"
-    #    dest: "{{ ansible_env.HOME }}/latest_snapshot.tar.lz4"
+    - name: Retrieve the latest allora snapshot URL
+      ansible.builtin.uri:
+        url: "https://www.polkachu.com/testnets/allora/snapshots"
+        return_content: yes
+      register: webpage_content
 
-    #- name: Stop 0G Validator Node service
-    #  ansible.builtin.systemd:
-    #    name: 0gd-node
-    #    state: stopped    
+    - name: Parse the snapshot URL
+      ansible.builtin.set_fact:
+        snapshot_url: "{{ webpage_content.content | regex_search('https://snapshots.polkachu.com/testnet-snapshots/allora/allora_[0-9]+\\.tar\\.lz4') }}"
 
-    #- name: Backup priv_validator_state.json
-    #  ansible.builtin.shell: |
-    #    cp {{ HOME_DIR }}/data/priv_validator_state.json {{ HOME_DIR }}/priv_validator_state.json.backup
-    #  args:
-    #    executable: /bin/bash
+    - name: Download the snapshot with curl and show progress
+      ansible.builtin.command: "curl -L {{ snapshot_url }} -o {{ ansible_env.HOME }}/.allorad/allora_snapshot.tar.lz4 --progress-bar"
+      register: curl_result
+      failed_when: curl_result.rc != 0
 
-    #- name: Reset tendermint state
-    #  ansible.builtin.shell: |
-    #    0gchaind tendermint unsafe-reset-all --home {{ HOME_DIR }} --keep-addr-book
-    #  args:
-    #    executable: /bin/bash
+    - name: Stop Allora Validator Node service
+      ansible.builtin.systemd:
+        name: allora-node
+        state: stopped    
 
-    #- name: Extract snapshot
-    #  ansible.builtin.shell: |
-    #    lz4 -d -c {{ ansible_env.HOME }}/latest_snapshot.tar.lz4 | tar -xf - -C {{ HOME_DIR }}
-    #  args:
-    #    executable: /bin/bash
+    - name: Backup priv_validator_state.json
+      ansible.builtin.shell: |
+        cp {{ APP_HOME }}/data/priv_validator_state.json {{ APP_HOME }}/priv_validator_state.json.backup
+      args:
+        executable: /bin/bash
 
-    #- name: Restore priv_validator_state.json
-    #  ansible.builtin.shell: |
-    #    mv {{ HOME_DIR }}/priv_validator_state.json.backup {{ HOME_DIR }}/data/priv_validator_state.json
-    #  args:
-    #    executable: /bin/bash
+    - name: Reset tendermint state
+      ansible.builtin.shell: |
+        allorad tendermint unsafe-reset-all --home {{ APP_HOME }} --keep-addr-book
+      args:
+        executable: /bin/bash
 
-    #- name: start 0G Validator Node service
-    #  ansible.builtin.systemd:
-    #    name: 0gd-node
-    #    state: started
+    - name: Extract the snapshot
+      ansible.builtin.shell:
+        cmd: "lz4 -d {{ ansible_env.HOME }}/.allorad/allora_snapshot.tar.lz4 | tar x -C {{ ansible_env.HOME }}/.allorad"
+        executable: /bin/bash
 
+    - name: Restore priv_validator_state.json
+      ansible.builtin.shell: |
+        mv {{ APP_HOME }}/priv_validator_state.json.backup {{ APP_HOME }}/data/priv_validator_state.json
+      args:
+        executable: /bin/bash
 
-
+    - name: Start Allora Validator Node service
+      ansible.builtin.systemd:
+        name: allora-node
+        state: started
