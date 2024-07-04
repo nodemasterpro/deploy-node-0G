@@ -10,7 +10,7 @@
     CONFIG_FILE: "{{ CONFIG_DIR }}/config.toml"
     BLOCKCHAIN_RPC_ENDPOINT: "http://127.0.0.1:8545"
     LOG_CONTRACT_ADDRESS: "0xb8F03061969da6Ad38f0a4a9f8a86bE71dA3c8E7"
-    LOG_SYNC_START_BLOCK_NUMBER: 661046
+    LOG_SYNC_START_BLOCK_NUMBER: 146130
   tasks:
     - name: System updates and installation of required environments
       ansible.builtin.apt:

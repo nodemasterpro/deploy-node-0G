@@ -11,9 +11,9 @@
   vars:
     ZGS_LOG_DIR: "{{ ansible_env.HOME }}/0g-storage-node/run/log"
     ZGS_LOG_CONFIG_FILE: "{{ ansible_env.HOME }}/0g-storage-node/run/log_config"
-    LOG_CONTRACT_ADDRESS: "0xb8F03061969da6Ad38f0a4a9f8a86bE71dA3c8E7"
-    MINE_CONTRACT: "0x96D90AAcb2D5Ab5C69c1c351B0a0F105aae490bE"
-    LOG_SYNC_START_BLOCK_NUMBER: 334797
+    LOG_CONTRACT_ADDRESS: "0x8873cc79c5b3b5666535C825205C9a128B1D75F1"
+    MINE_CONTRACT: "0x85F6722319538A805ED5733c5F4882d96F1C7384"
+    LOG_SYNC_START_BLOCK_NUMBER: 802
 
   tasks:
     - name: System updates and installation of required environments
@@ -35,7 +35,7 @@
       ansible.builtin.git:
         repo: 'https://github.com/0glabs/0g-storage-node.git'
         dest: "{{ ansible_env.HOME }}/0g-storage-node"
-        version: "tags/v0.3.2"
+        version: "tags/v0.3.3"
         force: yes
 
     - name: Build the 0G Storage Node

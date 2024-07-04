@@ -1,0 +1,37 @@
+---
+- name: Remove 0G Storage KV Node
+  hosts: localhost
+  become: true
+
+  vars:
+    STORAGE_KV_DIR: "{{ ansible_env.HOME }}/0g-storage-kv"
+    CONFIG_DIR: "{{ STORAGE_KV_DIR }}/run"
+    SERVICE_FILE: "/etc/systemd/system/zgs-kv.service"
+
+  tasks:
+    - name: Stop ZGS KV service
+      ansible.builtin.systemd:
+        name: zgs-kv
+        state: stopped
+      ignore_errors: yes
+
+    - name: Disable ZGS KV service
+      ansible.builtin.systemd:
+        name: zgs-kv
+        enabled: false
+      ignore_errors: yes
+
+    - name: Remove ZGS KV service file
+      ansible.builtin.file:
+        path: "{{ SERVICE_FILE }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove 0G Storage KV repository
+      ansible.builtin.file:
+        path: "{{ STORAGE_KV_DIR }}"
+        state: absent
+        recurse: yes
+      ignore_errors: yes
+
+
