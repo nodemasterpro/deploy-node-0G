@@ -101,7 +101,7 @@
       ansible.builtin.shell: |
         sed -i 's|log_contract_address = ".*"|log_contract_address = "{{ LOG_CONTRACT_ADDRESS }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
         sed -i 's|mine_contract_address = ".*"|mine_contract_address = "{{ MINE_CONTRACT }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
-        sed -i 's|blockchain_rpc_endpoint = ".*"|blockchain_rpc_endpoint = "https://0g-rpc.dongqn.com"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|blockchain_rpc_endpoint = ".*"|blockchain_rpc_endpoint = "http://127.0.0.1:8545"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
         sed -i 's|log_sync_start_block_number = ".*"|log_sync_start_block_number = {{ LOG_SYNC_START_BLOCK_NUMBER }}|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
         sed -i 's|miner_key = ".*"|miner_key = "{{ private_key_output.stdout }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
         sed -i 's|network_enr_address = ".*"|network_enr_address = "{{ external_ip.stdout }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
