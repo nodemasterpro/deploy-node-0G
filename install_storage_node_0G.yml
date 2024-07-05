@@ -23,6 +23,7 @@
           - clang
           - cmake
           - build-essential
+        state: present
 
     - name: Install Rustup
       ansible.builtin.shell: |
@@ -30,12 +31,20 @@
       args:
         executable: /bin/bash
 
+    - name: Install Go
+      ansible.builtin.shell: |
+        wget https://go.dev/dl/go1.22.0.linux-amd64.tar.gz
+        sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.22.0.linux-amd64.tar.gz
+        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
+        source ~/.profile
+      args:
+        executable: /bin/bash
 
     - name: Clone the 0G Storage Node repository
       ansible.builtin.git:
         repo: 'https://github.com/0glabs/0g-storage-node.git'
         dest: "{{ ansible_env.HOME }}/0g-storage-node"
-        version: "tags/v0.3.3"
+        version: "v0.3.3"
         force: yes
 
     - name: Build the 0G Storage Node
@@ -47,30 +56,10 @@
       args:
         executable: /bin/bash
 
-    - name: Set environment variables in .bash_profile
-      ansible.builtin.shell: |
-        echo 'export ZGS_LOG_DIR="{{ ZGS_LOG_DIR }}"' >> ~/.bash_profile
-        echo 'export ZGS_LOG_CONFIG_FILE="{{ ZGS_LOG_CONFIG_FILE }}"' >> ~/.bash_profile
-        echo 'export LOG_CONTRACT_ADDRESS="{{ LOG_CONTRACT_ADDRESS }}"' >> ~/.bash_profile
-        echo 'export MINE_CONTRACT="{{ MINE_CONTRACT }}"' >> ~/.bash_profile
-        source ~/.bash_profile
-      args:
-        executable: /bin/bash
-
-    - name: Source profile to ensure 0gchaind is in PATH
-      ansible.builtin.shell: |
-        source ~/.profile
-      args:
-        executable: /bin/bash
-
-    - name: Fetch external IP for RPC endpoint
-      ansible.builtin.shell: |
-        wget -qO- eth0.me
-      register: external_ip
-
-    - name: Set BLOCKCHAIN_RPC_ENDPOINT
-      set_fact:
-        BLOCKCHAIN_RPC_ENDPOINT: "https://0g-rpc.dongqn.com"
+    - name: Ensure config directory exists
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/0g-storage-node/run"
+        state: directory
 
     - name: Check if wallet info exists
       stat:
@@ -92,32 +81,32 @@
         echo $PRIVATE_KEY
       register: private_key_output
 
-    - name: Ensure config.toml exists
-      stat:
-        path: "{{ ansible_env.HOME }}/0g-storage-node/run/config.toml"
-      register: config_toml_check
-
-    - name: Fail if config.toml does not exist
-      fail:
-        msg: "config.toml file does not exist."
-      when: not config_toml_check.stat.exists
-
-    - name: Store private key in config
+    - name: Fetch external IP for RPC endpoint
       ansible.builtin.shell: |
-        sed -i 's|miner_key = ""|miner_key = "{{ private_key_output.stdout }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        wget -qO- eth0.me
+      register: external_ip
 
-    - name: Update config.toml
+    - name: Ensure IP is valid
       ansible.builtin.shell: |
-        sed -i 's|# log_config_file = "log_config"|log_config_file = "{{ ZGS_LOG_CONFIG_FILE }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
-        sed -i 's|# log_directory = "log"|log_directory = "{{ ZGS_LOG_DIR }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
-        sed -i 's|mine_contract_address = ".*"|mine_contract_address = "{{ MINE_CONTRACT }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        if echo "{{ external_ip.stdout }}" | grep -E -q '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+          echo "Valid IP address: {{ external_ip.stdout }}"
+        else
+          echo "Invalid IP address: {{ external_ip.stdout }}"
+          exit 1
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Update config.toml with new values
+      ansible.builtin.shell: |
         sed -i 's|log_contract_address = ".*"|log_contract_address = "{{ LOG_CONTRACT_ADDRESS }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
-        sed -i 's|blockchain_rpc_endpoint = ".*"|blockchain_rpc_endpoint = "{{ BLOCKCHAIN_RPC_ENDPOINT }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|mine_contract_address = ".*"|mine_contract_address = "{{ MINE_CONTRACT }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|blockchain_rpc_endpoint = ".*"|blockchain_rpc_endpoint = "https://0g-rpc.dongqn.com"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
         sed -i 's|log_sync_start_block_number = ".*"|log_sync_start_block_number = {{ LOG_SYNC_START_BLOCK_NUMBER }}|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
-        sed -i 's|# network_dir = "network"|network_dir = "network"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
-        sed -i 's|# network_libp2p_port = 1234|network_libp2p_port = 1234|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
-        sed -i 's|network_boot_nodes = \["/ip4/54.219.26.22/udp/1234/p2p/16Uiu2HAmPxGNWu9eVAQPJww79J32pTJLKGcpjRMb4Qb8xxKkyuG1","/ip4/52.52.127.117/udp/1234/p2p/16Uiu2HAm93Hd5azfhkGBbkx1zero3nYHvfjQYM2NtiW4R3r5bE2g"\]|network_boot_nodes = \["/ip4/54.219.26.22/udp/1234/p2p/16Uiu2HAmTVDGNhkHD98zDnJxQWu3i1FL1aFYeh9wiQTNu4pDCgps","/ip4/52.52.127.117/udp/1234/p2p/16Uiu2HAkzRjxK2gorngB1Xq84qDrT4hSVznYDHj6BkbaE4SGx9oS"\]|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
-        sed -i 's|# db_dir = "db"|db_dir = "db"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|miner_key = ".*"|miner_key = "{{ private_key_output.stdout }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+        sed -i 's|network_enr_address = ".*"|network_enr_address = "{{ external_ip.stdout }}"|' {{ ansible_env.HOME }}/0g-storage-node/run/config.toml
+      args:
+        executable: /bin/bash
 
     - name: Create systemd service file for 0G Storage Node
       ansible.builtin.template:
@@ -129,3 +118,4 @@
         name: zgs-node
         enabled: true
         state: started
+

@@ -35,8 +35,8 @@
 
     - name: Install Go
       ansible.builtin.shell: |
-        wget https://go.dev/dl/go1.22.4.linux-amd64.tar.gz
-        sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.22.4.linux-amd64.tar.gz
+        wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
+        sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz
         echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bash_profile
       args:
         executable: /bin/bash
@@ -53,8 +53,8 @@
 
     - name: Run install script
       ansible.builtin.shell: |
-        cd {{ ansible_env.HOME }}/0g-chain/networks/testnet
-        ./install.sh
+        cd {{ ansible_env.HOME }}/0g-chain
+        make install
       args:
         executable: /bin/bash
 
@@ -115,7 +115,7 @@
         P2P_PORT=26656
         PPROF_PORT=6060
         API_PORT=1317
-        GRPC_PORT=9090
+        GRPC_PORT=9092
         GRPC_WEB_PORT=9091
         RPC_PORT=26657
         sed -i \
