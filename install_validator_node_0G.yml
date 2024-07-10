@@ -33,6 +33,18 @@
           - wget
           - lz4
 
+    
+    - name: Check if /usr/local/go exists
+      stat:
+        path: /usr/local/go
+      register: go_directory
+
+    - name: Remove /usr/local/go directory
+      file:
+        path: /usr/local/go
+        state: absent
+      when: go_directory.stat.exists
+    
     - name: Install Go
       ansible.builtin.shell: |
         wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
