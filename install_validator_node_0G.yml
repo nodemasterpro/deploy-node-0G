@@ -62,6 +62,7 @@
         repo: 'https://github.com/0glabs/0g-chain.git'
         dest: "{{ ansible_env.HOME }}/0g-chain"
         version: "v0.2.3"
+        force: yes
 
     - name: Run install script
       ansible.builtin.shell: |
