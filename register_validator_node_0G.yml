@@ -16,13 +16,13 @@
     KEYRING_BACKEND: "test"
 
   tasks:
-  - name: Ensure node is fully synced
-    ansible.builtin.command:
-      cmd: 0gchaind status
-    register: node_status
-    until: node_status.stdout | from_json | json_query('sync_info.catching_up') == false
-    retries: 5
-    delay: 60
+    - name: Ensure node is fully synced
+      ansible.builtin.command:
+        cmd: 0gchaind status
+      register: node_status
+      until: node_status.stdout | from_json | json_query('sync_info.catching_up') == false
+      retries: 5
+      delay: 60
 
     - name: Get wallet address
       ansible.builtin.command:
