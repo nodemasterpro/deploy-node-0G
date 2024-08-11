@@ -5,7 +5,7 @@
     [Service]
     User=root
     Type=simple
-    ExecStart={{ ansible_env.HOME }}/go/bin/0gchaind start
+    ExecStart={{ ansible_env.HOME }}/go/bin/0gchaind start --log_output_console
     Restart=on-failure
     LimitNOFILE=65535
 
