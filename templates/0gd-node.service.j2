@@ -1,13 +1,14 @@
-    [Unit]
-    Description=0G Validator Node
-    After=network.target
+[Unit]
+Description=0G node
+After=network-online.target
 
-    [Service]
-    User=root
-    Type=simple
-    ExecStart={{ ansible_env.HOME }}/go/bin/0gchaind start --log_output_console
-    Restart=on-failure
-    LimitNOFILE=65535
+[Service]
+User={{ ansible_user }}
+WorkingDirectory={{ OG_HOME }}
+ExecStart={{ ansible_env.HOME }}/go/bin/0gchaind start --home {{ OG_HOME }} --log_output_console
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
 
-    [Install]
-    WantedBy=multi-user.target
+[Install]
+WantedBy=multi-user.target

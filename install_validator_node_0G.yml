@@ -11,289 +11,160 @@
   vars:
     CHAIN_ID: "zgtendermint_16600-2"
     KEYRING_BACKEND: "os"
-    RPC_PORT: "26657"
-    SEEDS: "59df4b3832446cd0f9c369da01f2aa5fe9647248@162.55.65.137:27956"
-    PERSISTENT_PEERS: "e371f26305869fd8294f6e57dc01ffbbd394a5ac@156.67.80.182:26656,a011565ee54a224c55c023eec938be579c75f00b@144.91.76.149:12656,7da685b1aca1f88dd36f152d2107fc462eceaa83@194.163.146.132:13456,f8e73164ef67ec5288f663b271d320f303832b49@149.102.147.164:12656,3a4612bab7aafd6f57ff857bf83a0fb447a47a75@65.21.114.39:56656,c45a79a6e28fbee2b35b55bc2e18644fe4d20bb8@62.171.131.80:12656,7baa9325f18259079d701d649d22221232dd7a8d@116.202.51.84:26656,dbb44850914d0507e082ea81efd32662f883b222@62.169.26.33:26656,c0cfc7c9d0cab4562e1933adf9fcc62f659f1b78@94.16.105.248:13456,8a35bbc61f8f90786dbbec7e8e1aaffb3d7d7f8c@62.169.31.45:13456,ecd31d198e658512967d964d8b80c1c8cc29a1d4@5.189.182.240:12656,0a827d0e1966731fd8680490601f49e5e9dc7130@158.220.109.21:26656,b517215f5542d9978981d63b7b926f8d70d9c9db@62.171.167.145:12656,a4cc54c65e2f14e1ac28103c816d6e4f8f4f06e0@65.108.6.59:26656,6bbaabdee63367f0a7d7cfb1143b6a160a9094cb@213.199.37.225:26656"
-    SNAPSHOT_URL: "https://snapshots-testnet.nodejumper.io/0g-testnet/0g-testnet_latest.tar.lz4"
-    HOME_DIR: "{{ ansible_env.HOME }}/.0gchain"
-    go_version: "1.22.6"
-
-
+    GO_VERSION: "1.21.3"
+    OG_VERSION: "v0.4.0"
+    OG_PORT: "47"
+    OG_HOME: "{{ ansible_env.HOME }}/.0gchain"
+    SEEDS: "8f21742ea5487da6e0697ba7d7b36961d3599567@og-testnet-seed.itrocket.net:47656"
+    PEERS: "80fa309afab4a35323018ac70a40a446d3ae9caf@og-testnet-peer.itrocket.net:11656,5c8426b14ff9cb62f10100de54f1d134a477105d@65.21.198.58:26656,4e7e6e9a3bc116612644d11b43c9b32b4003bb2c@37.27.128.102:26656"
+    SNAPSHOT_URL: "https://server-5.itrocket.net/testnet/og/og_2024-11-01_1751615_snap.tar.lz4"
+    GENESIS_URL: "https://server-5.itrocket.net/testnet/og/genesis.json"
+    ADDRBOOK_URL: "https://server-5.itrocket.net/testnet/og/addrbook.json"
 
   tasks:
     - name: Install required packages
-      ansible.builtin.apt:
+      apt:
         update_cache: yes
         name:
           - curl
-          - snapd
           - git
           - jq
-          - build-essential
-          - gcc
-          - unzip
-          - wget
           - lz4
-
-    
-    - name: Check if /usr/local/go exists
-      stat:
-        path: /usr/local/go
-      register: go_directory
-
-    - name: Remove /usr/local/go directory if it exists
-      file:
-        path: /usr/local/go
-        state: absent
-      when: go_directory.stat.exists
-
-    - name: Download Go archive
-      get_url:
-        url: "https://golang.org/dl/go{{ go_version }}.linux-amd64.tar.gz"
-        dest: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
-      register: download_status
-
-    - name: Ensure Go archive was downloaded
-      stat:
-        path: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
-      register: go_archive
-      failed_when: not go_archive.stat.exists
-
-    - name: Extract Go archive to /usr/local
-      ansible.builtin.unarchive:
-        src: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
-        dest: /usr/local
-        remote_src: yes
-      when: go_archive.stat.exists
-
-    - name: Clean up the downloaded Go archive
-      file:
-        path: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
-        state: absent
-      when: go_archive.stat.exists
-
-    - name: Add Go to PATH in .bash_profile if not present
-      lineinfile:
-        path: /root/.bash_profile
-        line: 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin'
-        create: yes
+          - wget
+          - build-essential
         state: present
 
-    - name: Source profile for Go (Apply PATH)
-      shell: source /root/.bash_profile
-      args:
-        executable: /bin/bash
+    - name: Install Go
+      block:
+        - name: Download Go
+          get_url:
+            url: "https://golang.org/dl/go{{ GO_VERSION }}.linux-amd64.tar.gz"
+            dest: "/tmp/go{{ GO_VERSION }}.linux-amd64.tar.gz"
 
-    - name: Verify Go installation
-      command: /usr/local/go/bin/go version
-      register: go_version
+        - name: Remove existing Go installation
+          file:
+            path: /usr/local/go
+            state: absent
 
-    - name: Print Go version
-      debug:
-        msg: "Installed Go version: {{ go_version.stdout }}"
+        - name: Extract Go
+          unarchive:
+            src: "/tmp/go{{ GO_VERSION }}.linux-amd64.tar.gz"
+            dest: /usr/local
+            remote_src: yes
 
-    - name: Set timezone to UTC
-      ansible.builtin.command:
-        cmd: timedatectl set-timezone UTC
+        - name: Add Go to PATH
+          lineinfile:
+            path: "{{ ansible_env.HOME }}/.bash_profile"
+            line: 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin'
+            create: yes
 
-    - name: Clone 0G chain repository
-      ansible.builtin.git:
-        repo: 'https://github.com/0glabs/0g-chain.git'
-        dest: "{{ ansible_env.HOME }}/0g-chain"
-        version: "v0.2.5"
-        force: yes
+        - name: Create go/bin directory
+          file:
+            path: "{{ ansible_env.HOME }}/go/bin"
+            state: directory
 
-    - name: Run install script
-      ansible.builtin.shell: |
-        cd {{ ansible_env.HOME }}/0g-chain
-        make install
-      args:
-        executable: /bin/bash
+    - name: Download and install 0G binary
+      block:
+        - name: Download 0G binary
+          get_url:
+            url: "https://github.com/0glabs/0g-chain/releases/download/{{ OG_VERSION }}/0gchaind-linux-{{ OG_VERSION }}"
+            dest: "{{ ansible_env.HOME }}/0gchaind"
+            mode: '0755'
 
-    - name: Source profile
-      ansible.builtin.shell: |
-        source $HOME/.profile
-      args:
-        executable: /bin/bash
+        - name: Move binary to go/bin
+          copy:
+            src: "{{ ansible_env.HOME }}/0gchaind"
+            dest: "{{ ansible_env.HOME }}/go/bin/0gchaind"
+            mode: '0755'
+            remote_src: yes
 
-    - name: Set Chain ID
-      ansible.builtin.shell: |
-        0gchaind config chain-id {{ CHAIN_ID }}
-      args:
-        executable: /bin/bash
+    - name: Initialize and configure node
+      block:
+        - name: Configure node
+          shell: |
+            0gchaind config node tcp://localhost:{{ OG_PORT }}657
+            0gchaind config keyring-backend {{ KEYRING_BACKEND }}
+            0gchaind config chain-id {{ CHAIN_ID }}
+          environment:
+            PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin:{{ ansible_env.HOME }}/go/bin"
 
-    - name: Initialize the node
-      ansible.builtin.shell: |
-        0gchaind init {{ moniker }} --chain-id {{ CHAIN_ID }}
-      args:
-        executable: /bin/bash
+        - name: Initialize node
+          shell: |
+            0gchaind init "{{ moniker }}" --chain-id {{ CHAIN_ID }}
+          environment:
+            PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin:{{ ansible_env.HOME }}/go/bin"
 
-    - name: Set keyring-backend
-      ansible.builtin.shell: |
-        0gchaind config keyring-backend {{ KEYRING_BACKEND }}
-      args:
-        executable: /bin/bash   
+    - name: Download genesis and addrbook
+      block:
+        - name: Download genesis.json
+          get_url:
+            url: "{{ GENESIS_URL }}"
+            dest: "{{ OG_HOME }}/config/genesis.json"
 
-    - name: Download genesis.json
-      ansible.builtin.shell: |
-        sudo apt install -y unzip wget
-        rm ~/.0gchain/config/genesis.json
-        wget -P ~/.0gchain/config https://github.com/0glabs/0g-chain/releases/download/v0.2.3/genesis.json
-      args:
-        executable: /bin/bash
+        - name: Download addrbook.json
+          get_url:
+            url: "{{ ADDRBOOK_URL }}"
+            dest: "{{ OG_HOME }}/config/addrbook.json"
 
-    - name: Validate genesis file
-      ansible.builtin.shell: |
-        0gchaind validate-genesis
-      args:
-        executable: /bin/bash
-        
-    - name: Add seeds to config.toml
-      ansible.builtin.shell: |
-        sed -i.bak -e "s/^seeds *=.*/seeds = \"{{ SEEDS }}\"/" {{ ansible_env.HOME }}/.0gchain/config/config.toml
-      args:
-        executable: /bin/bash
+    - name: Configure node settings
+      block:
+        - name: Set seeds and peers
+          shell: |
+            sed -i -e "/^\[p2p\]/,/^\[/{s/^[[:space:]]*seeds *=.*/seeds = \"{{ SEEDS }}\"/}" \
+                   -e "/^\[p2p\]/,/^\[/{s/^[[:space:]]*persistent_peers *=.*/persistent_peers = \"{{ PEERS }}\"/}" {{ OG_HOME }}/config/config.toml
 
-    - name: Add persistent peers to config.toml
-      ansible.builtin.shell: |
-        sed -i.bak -e "s/^persistent_peers *=.*/persistent_peers = \"{{ PERSISTENT_PEERS }}\"/" {{ ansible_env.HOME }}/.0gchain/config/config.toml
-      args:
-        executable: /bin/bash
+        - name: Set custom ports in app.toml
+          shell: |
+            sed -i.bak -e "s%:1317%:{{ OG_PORT }}317%g;
+            s%:8080%:{{ OG_PORT }}080%g;
+            s%:9090%:{{ OG_PORT }}090%g;
+            s%:9091%:{{ OG_PORT }}091%g;
+            s%:8545%:{{ OG_PORT }}545%g;
+            s%:8546%:{{ OG_PORT }}546%g;
+            s%:6065%:{{ OG_PORT }}065%g" {{ OG_HOME }}/config/app.toml
 
-    - name: Change ports (Optional)
-      ansible.builtin.shell: |
-        EXTERNAL_IP=$(wget -qO- eth0.me)
-        PROXY_APP_PORT=26658
-        P2P_PORT=26656
-        PPROF_PORT=6060
-        API_PORT=1317
-        GRPC_PORT=9092
-        GRPC_WEB_PORT=9091
-        RPC_PORT=26657
-        sed -i \
-            -e "s/\(proxy_app = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\1\2:$PROXY_APP_PORT\"/" \
-            -e "s/^laddr = \".*/laddr = \"tcp:\/\/0.0.0.0:$RPC_PORT\"/" \
-            -e "s/\(pprof_laddr = \"\)\([^:]*\):\([0-9]*\).*/\1localhost:$PPROF_PORT\"/" \
-            -e "/\[p2p\]/,/^\[/{s/\(laddr = \"tcp:\/\/\)\([^:]*\):\([0-9]*\).*/\10.0.0.0:$P2P_PORT\"/}" \
-            -e "/\[p2p\]/,/^\[/{s/\(external_address = \"\)\([^:]*\):\([0-9]*\).*/\1${EXTERNAL_IP}:$P2P_PORT\"/; t; s/\(external_address = \"\).*/\1${EXTERNAL_IP}:$P2P_PORT\"/}" \
-            $HOME/.0gchain/config/config.toml
-        sed -i \
-            -e "/\[api\]/,/^\[/{s/\(address = \"tcp:\/\/\)\([^:]*\):\([0-9]*\)\(\".*\)/\1\2:$API_PORT\4/}" \
-            -e "/\[grpc\]/,/^\[/{s/\(address = \"\)\([^:]*\):\([0-9]*\)\(\".*\)/\1\2:$GRPC_PORT\4/}" \
-            -e "/\[grpc-web\]/,/^\[/{s/\(address = \"\)\([^:]*\):\([0-9]*\)\(\".*\)/\1\2:$GRPC_WEB_PORT\4/}" \
-            $HOME/.0gchain/config/app.toml
-      args:
-        executable: /bin/bash
+        - name: Set custom ports in config.toml
+          shell: |
+            external_ip=$(wget -qO- eth0.me)
+            sed -i.bak -e "s%:26658%:{{ OG_PORT }}658%g;
+            s%:26657%:{{ OG_PORT }}657%g;
+            s%:6060%:{{ OG_PORT }}060%g;
+            s%:26656%:{{ OG_PORT }}656%g;
+            s%^external_address = \"\"%external_address = \"$external_ip:{{ OG_PORT }}656\"%;
+            s%:26660%:{{ OG_PORT }}660%g" {{ OG_HOME }}/config/config.toml
 
-    - name: Configure EVM RPC and WebSocket addresses
-      ansible.builtin.shell: |
-        sed -i 's/^address = "127.0.0.1:8545"/address = "0.0.0.0:8545"/' {{ ansible_env.HOME }}/.0gchain/config/app.toml
-        sed -i 's/^ws-address = "127.0.0.1:8546"/ws-address = "0.0.0.0:8546"/' {{ ansible_env.HOME }}/.0gchain/config/app.toml
-      args:
-        executable: /bin/bash
+        - name: Configure pruning and other settings
+          shell: |
+            sed -i -e "s/^pruning *=.*/pruning = \"custom\"/" {{ OG_HOME }}/config/app.toml
+            sed -i -e "s/^pruning-keep-recent *=.*/pruning-keep-recent = \"100\"/" {{ OG_HOME }}/config/app.toml
+            sed -i -e "s/^pruning-interval *=.*/pruning-interval = \"50\"/" {{ OG_HOME }}/config/app.toml
+            sed -i 's|minimum-gas-prices =.*|minimum-gas-prices = "0ua0gi"|g' {{ OG_HOME }}/config/app.toml
+            sed -i -e "s/prometheus = false/prometheus = true/" {{ OG_HOME }}/config/config.toml
+            sed -i -e "s/^indexer *=.*/indexer = \"null\"/" {{ OG_HOME }}/config/config.toml
 
-    - name: Configure pruning to save storage (Optional)
-      ansible.builtin.shell: |
-        sed -i \
-            -e "s/^pruning *=.*/pruning = \"custom\"/" \
-            -e "s/^pruning-keep-recent *=.*/pruning-keep-recent = \"100\"/" \
-            -e "s/^pruning-interval *=.*/pruning-interval = \"10\"/" \
-            "$HOME/.0gchain/config/app.toml"
-      args:
-        executable: /bin/bash
-
-    - name: Set min gas price
-      ansible.builtin.shell: |
-        sed -i "s/^minimum-gas-prices *=.*/minimum-gas-prices = \"0ua0gi\"/" $HOME/.0gchain/config/app.toml
-      args:
-        executable: /bin/bash
-
-    - name: Enable indexer (Optional)
-      ansible.builtin.shell: |
-        sed -i "s/^indexer *=.*/indexer = \"kv\"/" $HOME/.0gchain/config/config.toml
-      args:
-        executable: /bin/bash
-
-    - name: Ensure fs.inotify.max_user_instances is set to 256
-      ansible.builtin.sysctl:
-        name: fs.inotify.max_user_instances
-        value: 256
-        state: present
-        reload: yes    
-
-    - name: Increase the limit of open files
-      ansible.builtin.lineinfile:
-        path: /etc/security/limits.conf
-        line: "* soft nofile 65535\n* hard nofile 65535"
-        create: yes
-
-    - name: Set DefaultLimitNOFILE in systemd configuration
-      ansible.builtin.lineinfile:
-        path: /etc/systemd/system.conf
-        line: "DefaultLimitNOFILE=65535"
-        create: yes
-
-    - name: Set DefaultLimitNOFILE in user systemd configuration
-      ansible.builtin.lineinfile:
-        path: /etc/systemd/user.conf
-        line: "DefaultLimitNOFILE=65535"
-        create: yes
-
-    - name: Reload systemd daemon
-      ansible.builtin.shell: |
-        systemctl daemon-reload
-        systemctl restart systemd-logind
-      args:
-        executable: /bin/bash
-
-    - name: Create systemd service file for 0G Validator Node
-      ansible.builtin.template:
+    - name: Create and configure systemd service
+      template:
         src: templates/0gd-node.service.j2
-        dest: /etc/systemd/system/0gd-node.service
+        dest: /etc/systemd/system/0gchaind.service
 
-    - name: Enable and start 0G Validator Node service
-      ansible.builtin.systemd:
-        name: 0gd-node
-        enabled: true
-        state: started
+    - name: Reset and download snapshot
+      block:
+        - name: Reset node
+          shell: |
+            0gchaind tendermint unsafe-reset-all --home {{ OG_HOME }}
+          environment:
+            PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin:{{ ansible_env.HOME }}/go/bin"
 
-    #- name: Download latest snapshot
-    #  ansible.builtin.get_url:
-    #    url: "{{ SNAPSHOT_URL }}"
-    #    dest: "{{ ansible_env.HOME }}/latest_snapshot.tar.lz4"
+        - name: Download and extract snapshot
+          shell: |
+            curl {{ SNAPSHOT_URL }} | lz4 -dc - | tar -xf - -C {{ OG_HOME }}
+          ignore_errors: yes
 
-    #- name: Stop 0G Validator Node service
-    #  ansible.builtin.systemd:
-    #    name: 0gd-node
-    #    state: stopped    
-
-    #- name: Backup priv_validator_state.json
-    #  ansible.builtin.shell: |
-    #    cp {{ HOME_DIR }}/data/priv_validator_state.json {{ HOME_DIR }}/priv_validator_state.json.backup
-    #  args:
-    #    executable: /bin/bash
-
-    #- name: Reset tendermint state
-    #  ansible.builtin.shell: |
-    #    0gchaind tendermint unsafe-reset-all --home {{ HOME_DIR }} --keep-addr-book
-    #  args:
-    #    executable: /bin/bash
-
-    #- name: Extract snapshot
-    #  ansible.builtin.shell: |
-    #    lz4 -d -c {{ ansible_env.HOME }}/latest_snapshot.tar.lz4 | tar -xf - -C {{ HOME_DIR }}
-    #  args:
-    #    executable: /bin/bash
-
-    #- name: Restore priv_validator_state.json
-    #  ansible.builtin.shell: |
-    #    mv {{ HOME_DIR }}/priv_validator_state.json.backup {{ HOME_DIR }}/data/priv_validator_state.json
-    #  args:
-    #    executable: /bin/bash
-
-    #- name: start 0G Validator Node service
-    #  ansible.builtin.systemd:
-    #    name: 0gd-node
-    #    state: started
+    - name: Start service
+      systemd:
+        name: 0gchaind
+        enabled: yes
+        state: restarted
+        daemon_reload: yes
 
 
